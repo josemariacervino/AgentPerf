@@ -1,0 +1,238 @@
+ROL Y OBJETIVO
+Actuá como Performance Test Engineer senior y experto en Excel. Rehacé este libro como un analizador de resultados de Azure Load Testing (JMeter) para documentar y compartir con mi jefe: simple, prolijo, moderno y compacto. Si ya hay hojas RUN_ con datos, conservá los datos y pasalos al formato nuevo. Todo el contenido del libro (títulos, encabezados, estados y conclusiones) va en inglés, con los textos exactos que pongo entre comillas.
+
+==================== PARTE 1: CONTEXTO, CONFIG Y HOJAS RUN ====================
+
+1. CONTEXTO DEL TEST (GPS Pricing)
+- 3 secciones (thread groups): Admin Panel, Customer Search, Navigation.
+- Cómo reconocer cada fila de la tabla de Azure por su "Request name":
+  - Empieza con Pricing_00_ = Login (sección Other, solo informativo).
+  - Empieza con Pricing_01_AdminPanel_ = Admin Panel.
+  - Empieza con Pricing_02_CustomerSearch_ = Customer Search.
+  - Empieza con Pricing_03_Navigation_ = Navigation.
+  - También son TCs de Navigation, aunque no tienen prefijo: "Search Products", "Search Pricing Pool Maps", "Search Curve Periods", "Search Risk Rates".
+  - Todo lo demás (empieza con "/" o con un método, ej. "POST New - /pricing/...") es un request HTTP.
+  - Si la tabla trae una fila de total o aggregate, ignorala en los cálculos.
+
+2. HOJA CONFIG (todo editable, con estilo de input), con 5 tablas:
+
+a) "Scenarios": Scenario | Ramp-up (min) | Steady state (min) | Total VUs | Search VUs | Navigation VUs | Admin VUs | Admin loops per VU | Search Panel rate (/min) | Rate per Navigation screen (/min) | SLA P95 (ms) | Effective minutes
+   Val50    | 5  | 30 | 50  | 29  | 20  | 1 | 3 | 50  | 25  | 1000
+   Val100   | 5  | 30 | 99  | 58  | 40  | 1 | 3 | 100 | 50  | 1000
+   Baseline | 5  | 60 | 99  | 58  | 40  | 1 | 5 | 100 | 50  | 1000
+   Stress2x | 10 | 60 | 198 | 116 | 80  | 2 | 5 | 200 | 100 | 2000
+   Stress3x | 10 | 60 | 297 | 174 | 120 | 3 | 5 | 300 | 150 | 2000
+   Effective minutes es una fórmula: Steady state + Ramp-up / 2 (la tabla de Azure incluye la rampa).
+
+b) "Thresholds":
+   - P95 tolerance: 25% (OK <= SLA, WARN <= SLA x 1.25, FAIL arriba).
+   - Error OK: <= 0.5%. Error WARN: <= 1%. FAIL arriba de 1%.
+   - Workload OK: 90% a 110%. Workload WARN: 80% a 120%. FAIL fuera de eso.
+   - Data checks tolerance: 5%.
+
+c) "Runs": Sheet name | Scenario (desplegable con los escenarios de la tabla a) | Date | Notes. Esta lista alimenta los desplegables del DASHBOARD y de COMPARISON.
+
+d) "Transaction catalog". Define qué filas muestra el DASHBOARD y en qué orden. Columnas: Request name (exacto) | Section | Block | Short name | Level (Action / Main / Info) | SLA applies (Yes/No) | Workload (Rate / Loops / Check / No).
+
+   ADMIN PANEL (todos Level=Action, SLA=Yes, Workload=Loops)
+   Block "Pricing Pool Maintenance":
+   Pricing_01_AdminPanel_01_AdminPanel
+   Pricing_01_AdminPanel_02_PricingPoolMaintenance
+   Pricing_01_AdminPanel_03_AddNewPricingPool
+   Pricing_01_AdminPanel_04_EditPricingPool
+   Pricing_01_AdminPanel_05_AddNewRecord
+   Pricing_01_AdminPanel_06_EditRecord
+   Block "Product Definition":
+   Pricing_01_AdminPanel_07_ProductDefinition
+   Pricing_01_AdminPanel_08_AddNewProduct
+   Pricing_01_AdminPanel_09_EditProduct
+   Block "Curve Maintenance":
+   Pricing_01_AdminPanel_10_AdminPanel
+   Pricing_01_AdminPanel_11_CurveMaintenance
+   Pricing_01_AdminPanel_12_AddNewCurve
+   Pricing_01_AdminPanel_13_AddPeriod
+   Pricing_01_AdminPanel_14_NymexLiveCurve
+   Block "Business Maintenance":
+   Pricing_01_AdminPanel_15_AdminPanel
+   Pricing_01_AdminPanel_16_BusinessMaintenance
+   Pricing_01_AdminPanel_17_AddNewRiskRateBulk
+   Pricing_01_AdminPanel_18_EditRiskRateBulk
+
+   CUSTOMER SEARCH (todos Level=Action, SLA=Yes)
+   Pricing_02_CustomerSearch_01_SearchPanel (Workload=Rate)
+   Pricing_02_CustomerSearch_02_ByOfferId (Workload=Check)
+   Pricing_02_CustomerSearch_03_ByCustomerId (Workload=Check)
+   Pricing_02_CustomerSearch_04_ByLdcName (Workload=Check)
+   Pricing_02_CustomerSearch_05_ByLdcAccountNumber (Workload=Check)
+
+   NAVIGATION (un Block por pantalla, 3 filas por pantalla: Main, PageLoad, Search)
+   Block "01 Product Definition":
+   Pricing_03_Navigation_01_ProductDefinition (Level=Main, SLA=No, Workload=Rate)
+   Pricing_03_Navigation_01_ProductDefinition_PageLoad (Level=Action, SLA=Yes, Workload=No)
+   Search Products (Level=Action, SLA=Yes, Workload=No)
+   Block "02 Pricing Pool Maintenance":
+   Pricing_03_Navigation_02_PricingPoolMaintenance (Main, No, Rate)
+   Pricing_03_Navigation_02_PricingPoolMaintenance_PageLoad (Action, Yes, No)
+   Search Pricing Pool Maps (Action, Yes, No)
+   Block "03 Curve Maintenance":
+   Pricing_03_Navigation_03_CurveMaintenance (Main, No, Rate)
+   Pricing_03_Navigation_03_CurveMaintenance_PageLoad (Action, Yes, No)
+   Search Curve Periods (Action, Yes, No)
+   Block "04 Business Maintenance":
+   Pricing_03_Navigation_04_BusinessMaintenance (Main, No, Rate)
+   Pricing_03_Navigation_04_BusinessMaintenance_PageLoad (Action, Yes, No)
+   Search Risk Rates (Action, Yes, No)
+   El TC Main de Navigation suma la carga de la pantalla y la búsqueda, por eso es informativo y no se compara contra el SLA.
+
+   OTHER: cualquier Request name que empiece con Pricing_00_ (Level=Info, SLA=No, Workload=No).
+
+   Short name: número + nombre sin prefijo, ej. "03 · AddNewPricingPool" o "01 · ProductDefinition". Para las filas de detalle de Navigation: "PageLoad" y el nombre del Search tal cual.
+
+e) "Request map": Request | Used in. Precargá:
+   /pricing/api/pricing/v1/pricingpools -> Admin Panel + Customer Search
+   POST New - /pricing/api/pricing/v1/pricingpools -> Admin Panel
+   /pricing/api/pricing/v1/productpricingdetails -> Admin Panel + Navigation
+   /pricing/api/pricing/v1/productpricingdetails - by ppId -> Navigation
+   /pricing/api/pricing/v1/pricecurvedetails -> Admin Panel + Navigation
+   POST New - /pricing/api/pricing/v1/priceitemcurves -> Admin Panel
+   /pricing/api/pricing/v1/pricing-pool-maps -> Customer Search + Navigation
+   /pricing/api/pricing/v1/pricing-pool-maps - by PricingPool -> Navigation
+   /gpsservices/api/services/v1/pricing-accounts -> Customer Search
+   /gpsadmin/api/gpsadmin/v1/risk-rates -> Navigation
+   /home -> Other
+   Si "Used in" tiene un "+", el request es "Shared". Si un request no está en esta tabla, mostrar "Not mapped" (lo completo yo).
+
+3. HOJA RUN_TEMPLATE (y una hoja RUN_<Scenario>_<ddMMM> por cada corrida, copiada de la plantilla)
+- Filas 4 a 12, metadata con estilo de input: Run name | Scenario (fórmula que lo trae desde CONFIG "Runs") | Date | Duration (min) | Max VUs (Azure) | Azure total requests | Azure error % | Azure P90 (ms) | Azure throughput (/s).
+- Fila 13: encabezados exactos de la tabla "Request statistics" de Azure. Desde la fila 14 pego los datos:
+  Request name | Requests | Errors count | Error % | Min | Max | Mean | Median | P75 | P90 | P95 | P96 | P97 | P98 | P99 | P99.9 | Throughput
+- A la derecha, columnas auxiliares en gris, bajo el título "Helper – do not edit": Type (TC / Request / Total), Section, Short name, Error % calc, Used in, Rank P95 (solo requests), Rank errors (solo requests con errores). Para los rankings sumá ROW()/1000000, así no hay empates.
+- Para los cálculos no uses la columna Error % de Azure: calculá siempre Errors count / Requests.
+- Si al pegar algún valor queda como texto (con "ms", "%" o separadores), normalizalo a número en las auxiliares.
+- Dejá las fórmulas auxiliares preparadas hasta la fila 300.
+
+==================== PARTE 2: DASHBOARD ====================
+
+Arriba de todo, en este orden:
+
+4. Título "GPS Pricing · Performance Test Report". Debajo, un subtítulo gris con: run · scenario · date · duration.
+
+5. Fila de selección: "Run" con un desplegable (desde CONFIG "Runs"). Al lado: Scenario, SLA P95 (ms) y Error SLA de esa corrida.
+
+6. 4 tarjetas KPI en una fila:
+   - "WORKLOAD DELIVERED": el menor % entre los labels de workload.
+   - "HTTP ERROR RATE".
+   - "WORST P95": valor en ms y el short name del TC.
+   - "VIRTUAL USERS": máximo alcanzado vs esperado.
+   Cada tarjeta: etiqueta chica en gris y en mayúsculas, el valor grande en negrita con el color de su estado, y el estado debajo.
+
+7. Sección "Verdict": tabla Criterion | Result | Target | Status | Detail.
+   - "Workload achieved": YES si todos los labels de workload están OK; WARN si alguno está en WARN; NO si alguno está en FAIL.
+   - "HTTP error rate": errores / requests, SOLO de las filas Type=Request. No sumes los TCs, porque cuentan dos veces el mismo error.
+   - "Response time (P95 vs SLA)": cantidad de TCs con SLA=Yes en OK / WARN / FAIL.
+   - "Virtual users": OK si Max VUs >= 95% de los Total VUs del escenario.
+   - "FINAL VERDICT" (fila destacada):
+     - FAIL si Workload = NO, si el error rate está en FAIL o si algún P95 está en FAIL.
+     - "PASS WITH OBSERVATIONS" si hay algún WARN.
+     - Si no, PASS.
+     En Detail, el motivo en una frase corta (ej. "3 TCs above 1,250 ms").
+
+Después, las secciones:
+
+8. Sección "Workload delivered": Label | Expected | Actual | Delivered % | Status | How it is calculated.
+   - Navigation, los 4 TCs Main: Expected = Rate per Navigation screen x Effective minutes.
+   - Customer Search, el TC 01 SearchPanel: Expected = Search Panel rate x Effective minutes.
+   - Admin Panel, una sola fila para los 18 TCs: Expected = Admin VUs x Admin loops per VU. Actual = mínimo y máximo de Requests entre los 18 TCs. OK solo si el mínimo y el máximo están dentro del rango.
+
+9. Una sección por thread group, en este orden: Admin Panel, Customer Search, Navigation, y Other al final (si hay Login).
+   - Título de la sección y, debajo, una fila resumen: requests, error %, worst P95 y estado (el peor de la sección).
+   - Tabla: TC | Requests | Error % | Mean | P90 | P95 | P99 | Max | P95 status | Error status, con las filas en el orden del catálogo.
+   - Admin Panel: una fila de sub-bloque en negrita por cada bloque (Pricing Pool Maintenance, Product Definition, Curve Maintenance, Business Maintenance).
+   - Navigation: por pantalla, la fila Main en negrita con estado "INFO", y debajo, con sangría, PageLoad y Search con su estado.
+   - P95 status: OK <= SLA, WARN <= SLA x 1.25, FAIL arriba (usá el SLA del escenario de la corrida).
+   - Error status: OK <= 0.5%, WARN <= 1%, FAIL arriba.
+   - Pintá también las celdas de P95 y de Error % con el color de su estado.
+
+10. Sección "Top 5 slowest requests (P95)": Request | Used in | Requests | Error % | P90 | P95 | P99 | Max. Solo filas Type=Request, de toda la prueba.
+
+11. Sección "Top 5 requests by errors": Request | Used in | Requests | Errors | Error % | % of total errors. Si hay menos de 5 requests con errores, dejá el resto vacío.
+   - En los dos top, nombre corto del request = el método (si tiene) + lo que sigue a "/v1/" (ej. "POST New - pricingpools").
+   - Si el request es Shared, mostrá en Used in "Shared: Admin Panel + Customer Search".
+
+12. Sección "Conclusions": 4 o 5 frases automáticas armadas con fórmulas:
+   - el workload,
+   - el error rate y el request con más errores,
+   - cuántos TCs cumplen el SLA y cuál es el peor P95,
+   - el request más lento,
+   - el veredicto.
+   Debajo, un cuadro editable "Analyst notes" para escribir a mano.
+
+13. Sección "Data checks", al final y chica:
+   - Suma de Requests de la tabla vs Azure total requests (±1%).
+   - Suma de las búsquedas por filtro (Customer Search 02 a 05) vs Search Panel (±5%).
+   - En cada pantalla de Navigation: PageLoad y Search vs su TC Main (±5%).
+   - TCs del catálogo que no aparecen en la corrida (OK si son 0).
+
+==================== PARTE 3: COMPARISON, README, DISEÑO Y CALIDAD ====================
+
+14. HOJA COMPARISON
+   - Una fila con hasta 5 desplegables para elegir corridas (desde CONFIG "Runs"). Debajo de cada una: Scenario, SLA P95 y VUs.
+   - Bloque "P95 by transaction (ms)": las filas son los TCs con SLA=Yes, en el orden del catálogo y agrupados por sección y sub-bloque. Cada celda pintada según el SLA de SU propia corrida.
+   - Bloque "Totals": HTTP requests, HTTP error %, throughput, worst P95, workload delivered mínimo y final verdict de cada corrida.
+   - Bloque "Change vs first run": % de variación del P95 de cada TC contra la primera columna. Texto rojo si sube más de 10%, verde si baja más de 10%.
+   - Un gráfico de columnas agrupadas con el P95 por corrida de los TCs de Customer Search y de los PageLoad/Search de Navigation.
+
+15. HOJA README
+   - Cómo agregar una corrida: copiar RUN_TEMPLATE, renombrarla RUN_<Scenario>_<ddMMM> sin espacios, completar la metadata, pegar la tabla de Azure en A13, agregarla en CONFIG "Runs", elegirla en el DASHBOARD, revisar los Data checks, escribir las Analyst notes y exportar a PDF.
+   - Qué significa cada estado.
+   - Cómo se calcula el workload.
+
+16. Orden de las hojas: DASHBOARD, COMPARISON, CONFIG, README, RUN_TEMPLATE, RUN_...
+
+DISEÑO (moderno, limpio y compacto: nada cortado y sin scroll horizontal)
+- Fuente Arial en todo el libro:
+  - 10 para el texto normal.
+  - 16 negrita para el título de cada hoja.
+  - 11 negrita para los títulos de sección.
+  - 16 negrita para el valor de las tarjetas KPI, y 8 negrita en gris para sus etiquetas.
+  - Nada más grande que eso.
+- El DASHBOARD usa solo las columnas A a K y tiene que entrar entero a lo ancho en una notebook, al 100% de zoom.
+  - Anchos: A=2 (margen), B=36, C a I=10, J y K=11.
+  - En COMPARISON: A=2, B=36, C a H=12.
+- Los textos de Detail y How it is calculated, cortos (máximo ~60 caracteres), para que no se corten.
+- Sin líneas de cuadrícula en ninguna hoja. Inmovilizá las filas 1 a 4 del DASHBOARD.
+- Colores:
+  - Azul oscuro #1F3864: encabezados de tabla (texto blanco, negrita, centrado, alto 30, con ajuste de texto) y texto de los títulos.
+  - Títulos de sección: texto azul oscuro, con borde inferior medio #1F3864 y sin relleno.
+  - Filas de sub-bloque y filas Main de Navigation: relleno #EEF2F7 y negrita.
+  - Fila resumen de cada sección: relleno #F5F7FA.
+  - Cuerpo de las tablas: fondo blanco, solo líneas horizontales finas #E4E7EC.
+  - Texto secundario (subtítulos, notas, auxiliares): gris #667085.
+  - Inputs editables: relleno #FFF8E1 y texto azul #1D4ED8.
+  - Estados, en negrita y centrados (relleno / texto):
+    - OK, YES y PASS: #E3F4E8 / #1B7F3B
+    - WARN y PASS WITH OBSERVATIONS: #FFF3D6 / #A15C00
+    - FAIL y NO: #FDE7E7 / #B42318
+    - NO DATA: #F2F4F7 / #667085
+    - INFO: #EAF1FB / #1F3864
+  - Tarjetas KPI: fondo blanco con borde fino #D0D5DD.
+  - Color de las pestañas: DASHBOARD #1F3864, COMPARISON #2E5C9A, CONFIG y README #98A2B3, RUN_ #D0D5DD.
+- Alineación: textos a la izquierda, números a la derecha, estados centrados. Las filas de detalle de Navigation, con sangría.
+- Formatos de número:
+  - requests "#,##0"
+  - milisegundos "#,##0", sin decimales
+  - error % "0.00%"
+  - workload "0.0%"
+  - throughput "0.00"
+- No combines celdas (usá "Centrar en la selección"), salvo el cuadro de Analyst notes.
+- Configurá la impresión del DASHBOARD y de COMPARISON: horizontal, ajustada a 1 página de ancho y con márgenes estrechos, para exportar a un PDF prolijo.
+
+REGLAS DE FÓRMULAS Y CALIDAD
+- Sin macros. Usá funciones clásicas y estables: INDEX/MATCH, SUMIFS, COUNTIFS, MAXIFS, MINIFS, LARGE, IFERROR e INDIRECT (con el nombre de la hoja entre comillas simples). No uses fórmulas que se derramen (FILTER, SORT, UNIQUE) dentro de tablas con formato fijo.
+- Ningún umbral escrito a mano dentro de las fórmulas: todo referenciado a CONFIG.
+- Si falta un dato o una fórmula da error, mostrá "NO DATA" en gris. Nunca muestres PASS u OK sobre un dato faltante.
+- Al terminar, revisá todas las hojas y confirmame:
+  1) que no queda ningún #REF!, #N/A, #NAME?, #VALUE!, #DIV/0! ni #SPILL!;
+  2) que, con una corrida cargada, el total de requests coincide con el de Azure;
+  3) la lista de lo que tengo que completar a mano.
+- Construí el libro completo sin pedirme confirmaciones en el medio. Si algo no lo podés hacer (por ejemplo el gráfico o la configuración de impresión), decímelo al final.
