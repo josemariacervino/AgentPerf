@@ -272,36 +272,3 @@ e) En COMPARISON, agregá el bloque "Resources (max %)": CPU max % y Memory max 
 f) Diseño igual que el resto (Arial 10, encabezados #1F3864, estados con los mismos colores, sin cuadrícula). Columnas compactas: Resource 34, Type 16, el resto 9 a 10, Notes 30.
 
 g) Orden de hojas final: DASHBOARD, COMPARISON, RESOURCES, CONFIG, README, RUN_TEMPLATE, RUN_...
-
-
-
-
-Parameter	Validation 50 VUs	Validation 100 VUs	Baseline	Stress 2x	Stress 3x
-Duration					
-Ramp-up (min)	5	5	5	10	10
-Steady state (min)	30	30	60	60	60
-Total duration (min)	35	35	65	70	70
-Users (VUs)					
-Search VUs	29	58	58	116	174
-Navigation VUs	20	40	40	80	120
-Admin VUs	1	1	1	2	3
-Total VUs	50	99	99	198	297
-Pacing and timers					
-Search pacing (s per VU)	104.4	104.4	104.4	104.4	104.4
-ctt.search	0.5747	0.5747	0.5747	0.5747	0.5747
-Navigation pacing (s per VU)	144	144	144	144	144
-ctt.nav	0.4167	0.4167	0.4167	0.4167	0.4167
-Admin pacing (min per loop)	10	10	12	12	12
-ctt.admin	0.10000	0.10000	0.08333	0.08333	0.08333
-Admin loops (per VU)	3	3	5	5	5
-Think time Admin / Search / Nav (ms)	2,000 / 2,000 / 10,000	igual	igual	igual	igual
-Expected rates					
-Search Panel per min	16.7	33.3	33.3	66.7	100.0
-Per Navigation screen per min	8.3	16.7	16.7	33.3	50.0
-Navigation pages per min	33.3	66.7	66.7	133.3	200.0
-Expected totals (steady state)					
-Searches	500	1,000	2,000	4,000	6,000
-Pages	1,000	2,000	4,000	8,000	12,000
-Admin per case	3	3	5	10	15
-Admin (flows)	30	30	50	100	150
-Total transactions	1,530	3,030	6,050	12,100	18,150
