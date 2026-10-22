@@ -272,3 +272,14 @@ e) En COMPARISON, agregá el bloque "Resources (max %)": CPU max % y Memory max 
 f) Diseño igual que el resto (Arial 10, encabezados #1F3864, estados con los mismos colores, sin cuadrícula). Columnas compactas: Resource 34, Type 16, el resto 9 a 10, Notes 30.
 
 g) Orden de hojas final: DASHBOARD, COMPARISON, RESOURCES, CONFIG, README, RUN_TEMPLATE, RUN_...
+
+
+	Val 50	Val 100	Baseline	Stress 2x	Stress 3x
+VUs Search	29	58	58	116	174
+Pacing por VU	104.4 s	104.4 s	104.4 s	104.4 s	104.4 s
+ctt.search	0.5747	0.5747	0.5747	0.5747	0.5747
+Think time	2 s	2 s	2 s	2 s	2 s
+Ritmo Search Panel	16.7/min	33.3/min	33.3/min	66.7/min	100/min
+Búsquedas por hora	1,000	2,000	2,000	4,000	6,000
+Estable	30 min	30 min	60 min	60 min	60 min
+Búsquedas totales (estable)	500	1,000	2,000	4,000	6,000
