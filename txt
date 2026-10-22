@@ -236,3 +236,39 @@ REGLAS DE FÓRMULAS Y CALIDAD
   2) que, con una corrida cargada, el total de requests coincide con el de Azure;
   3) la lista de lo que tengo que completar a mano.
 - Construí el libro completo sin pedirme confirmaciones en el medio. Si algo no lo podés hacer (por ejemplo el gráfico o la configuración de impresión), decímelo al final.
+
+==================== PARTE 4: HOJA RESOURCES ====================
+
+17. HOJA RESOURCES (una sola hoja para todas las corridas; los valores los cargo a mano desde Azure Monitor / App Insights)
+
+a) Arriba, tabla "R1 resources" (catálogo, editable):
+   Resource | Type | Env | Release | CPU cores | Memory (Gi) | Min replicas | Max replicas
+   CZE-E-N-RETGAS-S-APIMS-01 | API Management Service | Stage | R1 | - | - | - | -
+   CZE-ADMINAPI-S-ACA-001 | Container App | Stage | R1 | 0.5 | 1 | 1 | 10
+   CZE-GPSSVCSAPI-S-ACA-001 | Container App | Stage | R1 | 0.5 | 1 | 1 | 10
+   CZE-PRICINGAPI-S-ACA-001 | Container App | Stage | R1 | 0.5 | 1 | 1 | 10
+   CZE-I-S-RETPRDB-SQL-04 (RetailGasPricingStage-DB-01) | SQL Server | Stage | R1 | - | - | - | -
+   CZE-I-S-RETGASSFINTG-SQL-04 (RetailGasCRMStage-DB-01) | SQL Server | Stage | R1 | - | - | - | -
+
+b) Debajo, tabla "Resource usage by run" (inputs editables), con una fila por corrida y por recurso. Los recursos se agrupan por corrida, con una fila separadora en negrita con el nombre de la corrida.
+   Columnas: Run (desplegable desde CONFIG "Runs") | Resource (desplegable desde el catálogo) | Type (automático) | CPU avg % | CPU max % | Memory avg % | Memory max % | Replicas min used | Replicas max used | Replicas used % (= max used / Max replicas) | Requests | Failed % | Avg duration (ms) | Status | Notes
+   - Container Apps: completar CPU, Memory y Replicas.
+   - API Management: usar CPU avg/max % como "Capacity %", y completar Requests, Failed % y Avg duration.
+   - SQL Server: usar CPU avg/max % como "CPU / DTU %", Memory como "Data IO %", y anotar deadlocks o bloqueos en Notes.
+   - Las columnas que no aplican a cada tipo van en gris claro con "-".
+   - Precargar 6 filas vacías (una por recurso) para cada corrida de CONFIG "Runs", así solo completo los números.
+
+c) Umbrales (agregarlos en CONFIG "Thresholds"):
+   - CPU y Memory max %: OK < 70%, WARN 70% a 85%, FAIL > 85%.
+   - Replicas: WARN si Replicas max used = Max replicas (llegó al techo de escalado).
+   - Failed % de APIM: los mismos umbrales del error rate (0.5% / 1%).
+   - Status de cada fila = el peor de sus métricas. Si la fila no tiene datos: "NO DATA".
+   - Pintar CPU max %, Memory max % y Replicas used % con el color de su estado.
+
+d) En el DASHBOARD, agregá una sección chica "Resources", después de los Top 5: una fila por recurso con CPU max %, Memory max %, Replicas max used / Max y Status de la corrida elegida (traído de la hoja RESOURCES). Si no cargué datos todavía: "NO DATA".
+
+e) En COMPARISON, agregá el bloque "Resources (max %)": CPU max % y Memory max % de cada Container App, más CPU/DTU max % de cada SQL, por corrida.
+
+f) Diseño igual que el resto (Arial 10, encabezados #1F3864, estados con los mismos colores, sin cuadrícula). Columnas compactas: Resource 34, Type 16, el resto 9 a 10, Notes 30.
+
+g) Orden de hojas final: DASHBOARD, COMPARISON, RESOURCES, CONFIG, README, RUN_TEMPLATE, RUN_...
